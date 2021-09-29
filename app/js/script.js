@@ -1,10 +1,11 @@
-console.log("hay ya!");
-
 const sprites = new Image();
 sprites.src = "./img/sprites.png";
 
 const canvas = document.querySelector("#game-canvas");
 const ctx = canvas.getContext("2d");
+let frames = 0;
+const FPS = 15;
+let bestScore = 0;
 
 // ----- OBJECTS -----
 
@@ -18,14 +19,13 @@ const bird = {
   canY: 50,
   canW: 33,
   vel: 0,
-  jmp: 5,
+  jmp: 4,
   mov: [
     { srcX: 0, srcY: 0 }, //up
     { srcX: 0, srcY: 26 }, // middle
     { srcX: 0, srcY: 52 }, // down
   ],
   wings() {
-    //this.srcX = this.mov[0].srcX;
     if (bird.srcY == bird.mov[0].srcY) {
       bird.srcY = bird.mov[1].srcY;
     } else if (bird.srcY == bird.mov[1].srcY) {
@@ -35,25 +35,85 @@ const bird = {
     }
   },
   jump() {
-    //bird.canY = bird.canY - 50;
     bird.vel = -bird.jmp;
-    console.log(bird.canY);
+    //console.log(bird.canY);
   },
 };
 
 const floor = {
   srcX: 0,
   srcY: 618,
-  w: 220,
-  h: 112,
+  w: 50,
+  h: 120,
   canX: 0,
   canY: canvas.height - 105,
   canW: canvas.width * 2, // width relative to game´s screen (320) -- * 2 for floor movimentation
 };
 
+const coin = {
+  //srcX: 47,
+  //srcY: 122,
+  w: 45,
+  h: 45,
+  canX: 90,
+  canY: 140,
+  canW: 40,
+  coin: [
+    { srcX: 0, srcY: 80 }, //1
+    { srcX: 47, srcY: 80 }, // 2
+    { srcX: 47, srcY: 124 }, // 3
+    { srcX: 0, srcY: 124 }, //4
+  ],
+  scoreCoin() {
+    //20px -> pass 1 pipe
+    if (score.score <= 200) {
+      coin.srcX = coin.coin[0].srcX;
+      coin.srcY = coin.coin[0].srcY;
+      console.log("1");
+    } else if (score.score > 200 && score.score <= 400) {
+      coin.srcX = coin.coin[1].srcX;
+      coin.srcY = coin.coin[1].srcY;
+      console.log("2");
+    } else if (score.score > 400 && score.score <= 600) {
+      coin.srcX = coin.coin[2].srcX;
+      coin.srcY = coin.coin[2].srcY;
+      console.log("3");
+    } else if (score.score > 600) {
+      coin.srcX = coin.coin[3].srcX;
+      coin.srcY = coin.coin[3].srcY;
+      console.log("4");
+    }
+  },
+};
+
+const score = {
+  score: 0,
+  draw(x, y) {
+    // https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/fillText
+    ctx.font = "18px serif";
+    ctx.fillStyle = "white";
+    ctx.fillText(`${score.score}`, x, y);
+  },
+  drawBestScore() {
+    if (score.score > bestScore) {
+      bestScore = score.score;
+    }
+
+    ctx.font = "18px serif";
+    ctx.fillStyle = "white";
+    ctx.fillText(`${bestScore}`, 210, 185);
+  },
+  update() {
+    if (frames % FPS == 0) {
+      frames = 0;
+      score.score++;
+      //console.log(frames);
+    }
+  },
+};
+
 function createPipe(x, y) {
   const pipe = {
-    //???
     w: 52,
     h: 400,
     canW: 52,
@@ -121,7 +181,6 @@ function createPipe(x, y) {
       );
     },
   };
-
   return pipe;
 }
 
@@ -140,6 +199,16 @@ const getReadyScreen = {
   srcY: 0,
   w: 174,
   h: 152,
+  canX: canvas.width / 2 - 174 / 2,
+  canY: 50,
+  canW: 174,
+};
+
+const gameOverScreen = {
+  srcX: 134,
+  srcY: 153,
+  w: 226,
+  h: 200,
   canX: canvas.width / 2 - 174 / 2,
   canY: 50,
   canW: 174,
@@ -169,6 +238,10 @@ const screens = {
     moves() {
       bgmovement();
       bird.wings();
+
+      // reset velues when is game over
+      bird.vel = 0;
+      score.score = 0;
     },
   },
   gameScreen: {
@@ -180,12 +253,15 @@ const screens = {
       });
       draw(floor);
       draw(bird);
+      score.draw(10, 20);
     },
     moves() {
       fall();
       bird.wings();
       bgmovement();
       bird.wings();
+      score.update();
+      coin.scoreCoin();
 
       pipes.forEach((pipe) => {
         pipe.translatePipes();
@@ -198,9 +274,14 @@ const screens = {
       draw(bg);
       draw(floor);
       draw(bird);
+      draw(gameOverScreen);
+      draw(coin);
+      score.drawBestScore();
     },
     moves() {
-      bird.vel = 0;
+      score.draw(210, 140);
+      // bird.vel = 0;
+      // score.score = 0;
     },
   },
 };
@@ -211,13 +292,13 @@ let activeScreen = screens.startScreen;
 // click events
 window.onclick = function () {
   // fist click
-  if (
-    activeScreen == screens.startScreen ||
-    activeScreen == screens.gameOverScreen
-  ) {
+  if (activeScreen == screens.startScreen) {
     bird.canY = 50;
-    //resetgame();
     activeScreen = screens.gameScreen;
+  } else if (activeScreen == screens.gameOverScreen) {
+    bird.canY = 50;
+    activeScreen = screens.startScreen;
+    console.log("!");
   } else {
     bird.jump();
   }
@@ -247,10 +328,6 @@ function draw(e = null) {
   }
 }
 
-// function translatePipes(pipes){
-//   pipes.floor.canX--;
-//   pipes.sky.canX--;
-// }
 function resetPipes() {
   pipes[0] = createPipe(320, 230);
   pipes[1] = createPipe(501, 200);
@@ -259,33 +336,26 @@ function resetPipes() {
 function collision(pipe) {
   const birdHead = bird.canY;
   const birdFoot = bird.canY + bird.h;
-  //console.log(pipe.sky.canY );
 
   // bird.canX + bird.w = bird's beak
   if (bird.canX + bird.w >= pipe.floor.canX) {
-    //(canvas.height + pipe.sky.canY) sky.canY is oq soboru de tela para o cano
-    //Ex: 200 (cade de baixo) + 80 (espace) = - 280
+    // (canvas.height + pipe.sky.canY) sky.canY is oq soboru de tela para o cano
+    // Ex: 200 (cade de baixo) + 80 (espace) = - 280
     // 400 - 280 = 120 -> sky pipe espace
     if (birdHead <= canvas.height + pipe.sky.canY) {
-      //console.log(pipe.sky.canY);
-
       console.log("cima");
       return true;
     }
-
     if (birdFoot >= pipe.floor.canY) {
       console.log("baixo");
       return true;
     }
   }
-
   return false;
 }
 
 function fall() {
   bird.vel = bird.vel + 0.25;
-  //console.log(bird.vel);
-
   return (bird.canY = bird.canY + bird.vel);
 }
 
@@ -295,7 +365,6 @@ function bgmovement() {
   // repit floor
   if (floor.canX <= -canvas.width) {
     floor.canX = 0;
-    //console.log("move");
   }
 }
 
@@ -303,15 +372,12 @@ function makeCollision() {
   if (bird.canY >= floor.canY - bird.h) {
     activeScreen = screens.gameOverScreen;
     resetPipes();
-    console.log("over");
   }
 }
 
 // ----- MAIN -----
 function loop() {
-  //let activeScreen = { startScreen };
-  //fall();
-  // activeScreen = screens.startScreen;
+  frames++;
   activeScreen.draw();
   activeScreen.moves();
 
@@ -321,4 +387,3 @@ function loop() {
 }
 
 loop();
-// setInterval(1000 / 30);
